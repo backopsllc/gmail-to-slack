@@ -4,11 +4,38 @@
   crossorigin="anonymous"
 ></script>
 <script>
-  function onSuccess(numUnread) {
-    var div = document.getElementById('output');
-    div.innerHTML =
-      'You have ' + numUnread + ' unread messages in your Gmail inbox.';
+  // Prevent forms from submitting.
+  function preventFormSubmit() {
+    var forms = document.querySelectorAll('form');
+    for (var i = 0; i < forms.length; i++) {
+      forms[i].addEventListener('submit', function (event) {
+        event.preventDefault();
+      });
+    }
   }
-
-  google.script.run.withSuccessHandler(onSuccess).getUnreadEmails();
+  window.addEventListener('load', preventFormSubmit);
+  function onSuccess(result) {
+    google.script.host.close();
+  }
+  function onFailure(e) {
+    alert(e.message + '\n\n' + e.stack);
+  }
+  function handleFormSubmit(formObject, mode) {
+    switch (mode) {
+      case 'init':
+        google.script.run
+          .withSuccessHandler(onSuccess)
+          .withFailureHandler(onFailure)
+          .init(formObject);
+        break;
+      case 'run':
+        google.script.run
+          .withSuccessHandler(onSuccess)
+          .withFailureHandler(onFailure)
+          .run(formObject);
+        break;
+      default:
+        alert('Unknown mode: ' + mode);
+    }
+  }
 </script>

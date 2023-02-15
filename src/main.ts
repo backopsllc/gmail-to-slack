@@ -35,7 +35,7 @@ function menuItem2() {
 
 function menuItem3() {
   const _query = 'is:inbox';
-  const _channel = '#random';
+  const _channel = '#gmail';
   SpreadsheetService.showMessage(
     'Start',
     'Post Messages to Slack channel ' + _channel
@@ -49,11 +49,11 @@ function menuItem4() {
 }
 
 function getGmailMessages(query: string) {
-  Logger.log('getGmailMessages', query);
+  Logger.log('getGmailMessages:' + query);
 
   // 1日前よりも新しいメールを取得する
   const _gmailThreads = GmailApp.search('newer_than:1d ' + query);
-  Logger.log('Threads count', _gmailThreads.length);
+  Logger.log('Threads count: ' + _gmailThreads.length);
 
   // sheetを取得する
   const _sheet = SpreadsheetService.getSheetByName(query);
@@ -69,7 +69,7 @@ function getGmailMessages(query: string) {
     _count === 0
       ? [['メッセージID', '送信者', '宛先', '件名', '日付', 'slack送信日時']]
       : _values;
-  Logger.log('Sheet Data count', _count);
+  Logger.log('Sheet Data count: ' + _count);
 
   // 新着のメールを追加する
   _gmailThreads.forEach(thread => {
@@ -102,7 +102,7 @@ function getGmailMessages(query: string) {
 
   // 新着メール件数
   const _newCount = _newValues.length - _count;
-  Logger.log('New Messages count', _newCount);
+  Logger.log('New Messages count: ' + _newCount);
 
   // sheetにデータを書き込む
   if (_newCount > 0) {
@@ -113,7 +113,7 @@ function getGmailMessages(query: string) {
       _newValues.length,
       _newValues[0].length
     ).setNumberFormat('@');
-    Logger.log('Save Sheet', _newValues.length);
+    Logger.log('Save Sheet: ' + _newValues.length);
     SpreadsheetService.setValues(_newRange, _newValues);
   }
 
@@ -121,7 +121,7 @@ function getGmailMessages(query: string) {
 }
 
 function postMessages(query: string, channel: string) {
-  Logger.log('postMessages', query, channel);
+  Logger.log('postMessages: ' + query + ', ' + channel);
 
   // sheetを取得する
   const _sheet = SpreadsheetService.getSheetByName(query);
@@ -138,7 +138,7 @@ function postMessages(query: string, channel: string) {
   if (token) {
     _values.forEach(val => {
       if (val.length === 6 && val[5] === '') {
-        Logger.log('Get MessageId', val[0]);
+        Logger.log('Get MessageId: ' + val[0]);
         const messageById = GmailApp.getMessageById(val[0]);
 
         // メッセージ送信する
@@ -193,10 +193,11 @@ function postMessages(query: string, channel: string) {
       }
     });
   }
+  Logger.log('Send Messages count: ' + _sendCount);
 
   // sheetにデータを書き込む
   if (_sendCount > 0) {
-    Logger.log('Save Sheet', _values.length);
+    Logger.log('Save Sheet: ' + _values.length);
     SpreadsheetService.setValues(_range, _values);
   }
 
@@ -216,11 +217,23 @@ const getConfig = function (): UserProperty {
 };
 
 const init = function (property: UserProperty) {
-  Logger.log('init', property);
+  Logger.log('init: ' + property);
   SpreadsheetService.setUserProperty('SLACK_BOT_TOKEN', property.slackBotToken);
   SpreadsheetService.showMessage('Success', 'Save UserProperties.');
 };
 
 const run = function () {
   Logger.log('run');
+};
+
+const run_cron = function () {
+  Logger.log('run_cron');
+  const _query = 'is:inbox';
+  const _channel = '#gmail';
+  new Promise<void>(resolve => {
+    getGmailMessages(_query);
+    resolve();
+  }).then(() => {
+    postMessages(_query, _channel);
+  });
 };

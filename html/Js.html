@@ -28,12 +28,6 @@
           .withFailureHandler(onFailure)
           .init(formObject);
         break;
-      case 'run':
-        google.script.run
-          .withSuccessHandler(onSuccess)
-          .withFailureHandler(onFailure)
-          .run(formObject);
-        break;
       default:
         alert('Unknown mode: ' + mode);
     }

@@ -4,6 +4,8 @@ import {SpreadSheetServiceImpl} from './SpreadSheetService';
 import {UserProperty} from './UserProperty';
 
 const SpreadsheetService = new SpreadSheetServiceImpl();
+const DefaultQuery = 'is:inbox';
+const DefaultChannel = '#random';
 
 function onOpen() {
   const _ui = SpreadsheetApp.getUi();
@@ -14,7 +16,7 @@ function onOpen() {
     .addItem('メール一覧取得', 'menuItem2')
     .addItem('Slack通知', 'menuItem3')
     .addItem('古いメールIDを削除', 'menuItem4')
-    .addItem('設定', 'openDialog')
+    .addItem('Token設定', 'openDialog')
     .addToUi();
 }
 
@@ -27,20 +29,17 @@ function menuItem1() {
 }
 
 function menuItem2() {
-  const _query = 'is:inbox';
-  SpreadsheetService.showMessage('Start', 'getGmailMessages: ' + _query);
-  const _count = getGmailMessages(_query);
+  SpreadsheetService.showMessage('Start', 'getGmailMessages: ' + DefaultQuery);
+  const _count = getGmailMessages(DefaultQuery);
   SpreadsheetService.showMessage('End', 'New Messages count: ' + _count);
 }
 
 function menuItem3() {
-  const _query = 'is:inbox';
-  const _channel = '#gmail';
   SpreadsheetService.showMessage(
     'Start',
-    'Post Messages to Slack channel ' + _channel
+    'Post Messages to Slack channel ' + DefaultChannel
   );
-  const _count = postMessages(_query, _channel);
+  const _count = postMessages(DefaultQuery, DefaultChannel);
   SpreadsheetService.showMessage('End', 'Post Messages count: ' + _count);
 }
 
@@ -89,11 +88,7 @@ function getGmailMessages(query: string) {
           msg.getFrom(),
           msg.getTo(),
           msg.getSubject(),
-          Utilities.formatDate(
-            msg.getDate(),
-            'Asia/Tokyo',
-            'yyyy-MM-dd HH:mm:ss'
-          ),
+          msg.getDate(),
           '',
         ]);
       }
@@ -222,18 +217,32 @@ const init = function (property: UserProperty) {
   SpreadsheetService.showMessage('Success', 'Save UserProperties.');
 };
 
-const run = function () {
-  Logger.log('run');
-};
-
 const run_cron = function () {
   Logger.log('run_cron');
-  const _query = 'is:inbox';
-  const _channel = '#gmail';
-  new Promise<void>(resolve => {
-    getGmailMessages(_query);
-    resolve();
-  }).then(() => {
-    postMessages(_query, _channel);
-  });
+  // 設定sheetを取得する
+  const _sheet = SpreadsheetService.getSheetByName('設定');
+  if (_sheet) {
+    // sheetデータを読み込む
+    const _range = SpreadsheetService.getRange(_sheet);
+    const _values = SpreadsheetService.getValues(_range);
+    // 1行づつ実行
+    _values.forEach((value, index) => {
+      if (index > 0 && value.length === 2) {
+        const _query = value[0] || '';
+        const _channel = value[1] || '#random';
+        new Promise<number>(resolve => {
+          const _count = getGmailMessages(_query);
+          resolve(_count);
+        })
+          .then(count => {
+            if (count > 0) {
+              postMessages(_query, _channel);
+            }
+          })
+          .finally(() => {
+            Logger.log('TODO: finally, ' + _query);
+          });
+      }
+    });
+  }
 };

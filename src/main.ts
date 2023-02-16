@@ -45,10 +45,13 @@ function menuItem3() {
 
 function menuItem4() {
   Logger.log('menuItem4');
+
+  const _count = deleteOldMessages(DefaultQuery, 2);
+  SpreadsheetService.showMessage('Success', 'Delete Rows: ' + _count);
 }
 
 function getGmailMessages(query: string) {
-  Logger.log('getGmailMessages:' + query);
+  Logger.log('getGmailMessages: ' + query);
 
   // 1日前よりも新しいメールを取得する
   const _gmailThreads = GmailApp.search('newer_than:1d ' + query);
@@ -56,18 +59,14 @@ function getGmailMessages(query: string) {
 
   // sheetを取得する
   const _sheet = SpreadsheetService.getSheetByName(query);
-
   // sheetデータを読み込む
   const _range = SpreadsheetService.getRange(_sheet);
   const _values = SpreadsheetService.getValues(_range);
+
   // sheetデータ件数
-  const _count =
-    _values.length === 1 && _values[0].length === 1 ? 0 : _values.length;
+  const _count = _values.length === 1 ? 0 : _values.length;
   // 保存データ
-  const _newValues: any[][] =
-    _count === 0
-      ? [['メッセージID', '送信者', '宛先', '件名', '日付', 'slack送信日時']]
-      : _values;
+  const _newValues: any[][] = _count === 0 ? [] : _values.slice(1);
   Logger.log('Sheet Data count: ' + _count);
 
   // 新着のメールを追加する
@@ -88,15 +87,28 @@ function getGmailMessages(query: string) {
           msg.getFrom(),
           msg.getTo(),
           msg.getSubject(),
-          msg.getDate(),
+          Utilities.formatDate(
+            msg.getDate(),
+            'Asia/Tokyo',
+            'yyyy-MM-dd HH:mm:ss'
+          ),
           '',
         ]);
       }
     });
   });
 
+  // 日付でソート
+  const _sorted = [
+    ['メッセージID', '送信者', '宛先', '件名', '日付', 'slack送信日時'],
+  ].concat(
+    _newValues.sort(
+      (a, b) => new Date(a[4]).getTime() - new Date(b[4]).getTime()
+    )
+  );
+
   // 新着メール件数
-  const _newCount = _newValues.length - _count;
+  const _newCount = _sorted.length - _count;
   Logger.log('New Messages count: ' + _newCount);
 
   // sheetにデータを書き込む
@@ -105,11 +117,11 @@ function getGmailMessages(query: string) {
       _sheet,
       1,
       1,
-      _newValues.length,
-      _newValues[0].length
+      _sorted.length,
+      _sorted[0].length
     ).setNumberFormat('@');
-    Logger.log('Save Sheet: ' + _newValues.length);
-    SpreadsheetService.setValues(_newRange, _newValues);
+    Logger.log('Save Sheet: ' + _sorted.length);
+    SpreadsheetService.setValues(_newRange, _sorted);
   }
 
   return _newCount;
@@ -120,7 +132,6 @@ function postMessages(query: string, channel: string) {
 
   // sheetを取得する
   const _sheet = SpreadsheetService.getSheetByName(query);
-
   // sheetデータを読み込む
   const _range = SpreadsheetService.getRange(_sheet);
   const _values = SpreadsheetService.getValues(_range);
@@ -181,8 +192,6 @@ function postMessages(query: string, channel: string) {
               'Asia/Tokyo',
               'yyyy-MM-dd HH:mm:ss'
             );
-          } else {
-            SpreadsheetService.showMessage('Error', `response: ${apiResponse}`);
           }
         }
       }
@@ -197,6 +206,37 @@ function postMessages(query: string, channel: string) {
   }
 
   return _sendCount;
+}
+
+function deleteOldMessages(query: string, daysAgo: number) {
+  Logger.log('deleteOldMessages: ' + query + ', ' + daysAgo);
+
+  // x日前の日付を求める
+  const _today = new Date();
+  const _xDaysAgo = new Date().setDate(_today.getDate() - daysAgo);
+
+  // sheetを取得する
+  const _sheet = SpreadsheetService.getSheetByName(query);
+  // sheetデータを読み込む
+  const _range = SpreadsheetService.getRange(_sheet);
+  const _values = SpreadsheetService.getValues(_range);
+
+  // x日以前の行数
+  const _removeCount = _values
+    .slice(1)
+    .filter(row => new Date(row[4]).getTime() < _xDaysAgo).length;
+  Logger.log(
+    Utilities.formatDate(new Date(_xDaysAgo), 'Asia/Tokyo', 'yyyy-MM-dd') +
+      ' 以前の行数: ' +
+      _removeCount
+  );
+
+  if (_removeCount > 0) {
+    // 2行目からx日以前の行まで削除
+    _sheet.deleteRows(2, _removeCount);
+  }
+
+  return _removeCount;
 }
 
 function openDialog() {
@@ -225,6 +265,7 @@ const run_cron = function () {
     // sheetデータを読み込む
     const _range = SpreadsheetService.getRange(_sheet);
     const _values = SpreadsheetService.getValues(_range);
+
     // 1行づつ実行
     _values.forEach((value, index) => {
       if (index > 0 && value.length === 2) {
@@ -240,7 +281,7 @@ const run_cron = function () {
             }
           })
           .finally(() => {
-            Logger.log('TODO: finally, ' + _query);
+            deleteOldMessages(_query, 2);
           });
       }
     });

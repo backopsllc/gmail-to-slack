@@ -276,25 +276,30 @@ const run_cron = function () {
     // sheetデータを読み込む
     const _range = SpreadsheetService.getRange(_sheet);
     const _values = SpreadsheetService.getValues(_range);
-
-    // 1行づつ実行
-    _values.slice(1).forEach(value => {
-      if (value.length === 2) {
+    _values
+      // 1行目はスキップ
+      .slice(1)
+      // フィルター条件とチャンネルの設定値が取得できる場合
+      .filter(value => value.length === 2)
+      // 1行づつ実行
+      .forEach(value => {
         const _query = value[0] || '';
         const _channel = value[1] || '#random';
         new Promise<number>(resolve => {
+          // 新着メールを取得する
           const _count = getGmailMessages(_query);
           resolve(_count);
         })
           .then(count => {
             if (count > 0) {
+              // slackにメッセージを投稿する
               postMessages(_query, _channel);
             }
           })
           .finally(() => {
+            // 古いメッセージ履歴を削除する
             deleteOldMessages(_query, 2);
           });
-      }
-    });
+      });
   }
 };

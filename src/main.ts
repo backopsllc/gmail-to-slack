@@ -80,6 +80,9 @@ function getGmailMessages(query: string) {
   // 保存データ
   const _newValues = _count === 0 ? [] : _values.slice(1);
 
+  // 1日前の日付と時間
+  const _previousDate = new Date(new Date().getDate() - 1);
+
   // 新着のメールを取得する
   _gmailThreads.forEach(thread => {
     thread
@@ -89,22 +92,25 @@ function getGmailMessages(query: string) {
         return !_messageIds.includes(msg.getId());
       })
       .forEach(msg => {
-        // メッセージID
-        const _id = msg.getId();
-        Logger.log('New Message Id: ' + _id);
-        // 保存データに追加
-        _newValues.push([
-          _id,
-          msg.getFrom(),
-          msg.getTo(),
-          msg.getSubject(),
-          Utilities.formatDate(
-            msg.getDate(),
-            'Asia/Tokyo',
-            'yyyy-MM-dd HH:mm:ss'
-          ),
-          '',
-        ]);
+        // メッセージの日付が1日前以内かどうかをチェック
+        if (msg.getDate() >= _previousDate) {
+          // メッセージID
+          const _id = msg.getId();
+          Logger.log('New Message Id: ' + _id);
+          // 保存データに追加
+          _newValues.push([
+            _id,
+            msg.getFrom(),
+            msg.getTo(),
+            msg.getSubject(),
+            Utilities.formatDate(
+              msg.getDate(),
+              'Asia/Tokyo',
+              'yyyy-MM-dd HH:mm:ss'
+            ),
+            '',
+          ]);
+        }
       });
   });
 

@@ -81,7 +81,8 @@ function getGmailMessages(query: string) {
   const _newValues = _count === 0 ? [] : _values.slice(1);
 
   // 1日前の日付と時間
-  const _previousDate = new Date(new Date().getDate() - 1);
+  const _previousDate = new Date();
+  _previousDate.setDate(_previousDate.getDate() - 1);
 
   // 新着のメールを取得する
   _gmailThreads.forEach(thread => {
